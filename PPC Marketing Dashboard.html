@@ -903,7 +903,7 @@ a { color: var(--color-link, var(--color-primary)); }</style>
             <i class="fas fa-cloud-upload-alt"></i>
             <h3>Import PPC Data</h3>
             <p style="color:var(--color-text-muted);font-size:0.85rem;">Upload a CSV/Excel file or paste your data below.</p>
-            <p style="font-size:0.8rem;color:var(--color-accent);margin:0.3rem 0 0.8rem;"><i class="fas fa-info-circle"></i> Expected columns: <span style="color:var(--color-text-muted);">Keyword, Match Type, Campaign, Bid, Impressions, Clicks, Spend, Sales, Orders, Date</span></p>
+            <p style="font-size:0.8rem;color:var(--color-accent);margin:0.3rem 0 0.8rem;"><i class="fas fa-info-circle"></i> Expected columns: <span style="color:var(--color-text-muted);">Keyword, Match Type, Platform, Campaign, Bid, Impressions, Clicks, Spend, Sales, Orders, Date</span></p>
             <div style="display:flex; gap:0.5rem; justify-content:center; margin-bottom:1rem; flex-wrap:wrap;">
                 <button class="btn" onclick="document.getElementById('fileInput').click()" style="background:linear-gradient(135deg,#0f3460,#1a1a3e);border:1px solid var(--color-info);color:var(--color-info);font-size:0.78rem;padding:0.45rem 0.9rem;border-radius:6px;">
                     <i class="fas fa-upload"></i> Upload CSV / Excel
@@ -934,6 +934,12 @@ yoga mat,Exact,Product Campaign,0.85,8000,320,272.00,1200.00,45,2024-01-15"></te
     <div class="tab-content" id="tab-table">
         <!-- Filters -->
         <div class="filters-bar">
+            <div class="filter-group">
+                <label>Platform</label>
+                <select id="filterPlatform" onchange="updateAll()">
+                    <option value="">All Platforms</option>
+                </select>
+            </div>
             <div class="filter-group">
                 <label>Campaign</label>
                 <select id="filterCampaign" onchange="renderTable()">
@@ -969,6 +975,7 @@ yoga mat,Exact,Product Campaign,0.85,8000,320,272.00,1200.00,45,2024-01-15"></te
                     <tr>
                         <th data-col="keyword" onclick="sortTable('keyword')">Keyword <span class="sort-icon"></span></th>
                         <th data-col="matchType" onclick="sortTable('matchType')">Match <span class="sort-icon"></span></th>
+                        <th data-col="platform" onclick="sortTable('platform')">Platform <span class="sort-icon"></span></th>
                         <th data-col="campaign" onclick="sortTable('campaign')">Campaign <span class="sort-icon"></span></th>
                         <th data-col="bid" onclick="sortTable('bid')">Bid <span class="sort-icon"></span></th>
                         <th data-col="impressions" onclick="sortTable('impressions')">Impressions <span class="sort-icon"></span></th>
@@ -1148,7 +1155,7 @@ function processRawData(text) {
 
     // Detect if first line is header
     const firstLine = lines[0].toLowerCase();
-    const hasHeader = firstLine.includes('keyword') || firstLine.includes('match') || firstLine.includes('campaign');
+    const hasHeader = firstLine.includes('keyword') || firstLine.includes('match') || firstLine.includes('platform') || firstLine.includes('campaign');
     const startIdx = hasHeader ? 1 : 0;
 
     let imported = 0;
@@ -1156,17 +1163,20 @@ function processRawData(text) {
         const cols = parseCSVLine(lines[i]);
         if (cols.length < 10) continue;
 
+        // Support both 10-col (no platform) and 11-col (with platform) formats
+        var hasPlat = cols.length >= 11;
         const entry = {
             keyword: cols[0] || '',
             matchType: normalizeMatchType(cols[1] || ''),
-            campaign: cols[2] || '',
-            bid: parseFloat(cols[3]) || 0,
-            impressions: parseInt(cols[4]) || 0,
-            clicks: parseInt(cols[5]) || 0,
-            spend: parseFloat(cols[6]) || 0,
-            sales: parseFloat(cols[7]) || 0,
-            orders: parseInt(cols[8]) || 0,
-            date: cols[9] || new Date().toISOString().split('T')[0]
+            platform: hasPlat ? (cols[2] || 'Amazon') : 'Amazon',
+            campaign: hasPlat ? (cols[3] || '') : (cols[2] || ''),
+            bid: parseFloat(hasPlat ? cols[4] : cols[3]) || 0,
+            impressions: parseInt(hasPlat ? cols[5] : cols[4]) || 0,
+            clicks: parseInt(hasPlat ? cols[6] : cols[5]) || 0,
+            spend: parseFloat(hasPlat ? cols[7] : cols[6]) || 0,
+            sales: parseFloat(hasPlat ? cols[8] : cols[7]) || 0,
+            orders: parseInt(hasPlat ? cols[9] : cols[8]) || 0,
+            date: (hasPlat ? cols[10] : cols[9]) || new Date().toISOString().split('T')[0]
         };
 
         if (entry.keyword) {
@@ -1233,30 +1243,31 @@ function processPaste() {
 }
 
 function loadSampleData() {
-    const sample = `running shoes,Broad,Brand Campaign,1.50,15000,450,675.00,2500.00,85,2024-01-15
-running shoes,Broad,Brand Campaign,1.75,16500,520,910.00,3100.00,102,2024-02-15
-running shoes,Broad,Brand Campaign,1.60,14200,410,656.00,2800.00,90,2024-03-15
-yoga mat,Exact,Product Campaign,0.85,8000,320,272.00,1200.00,45,2024-01-15
-yoga mat,Exact,Product Campaign,0.90,8500,350,315.00,1400.00,52,2024-02-15
-yoga mat,Exact,Product Campaign,0.95,9200,380,361.00,1600.00,58,2024-03-15
-wireless earbuds,Phrase,Electronics Campaign,2.20,25000,800,1760.00,5500.00,150,2024-01-15
-wireless earbuds,Phrase,Electronics Campaign,2.00,22000,720,1440.00,5200.00,140,2024-02-15
-wireless earbuds,Phrase,Electronics Campaign,2.50,28000,900,2250.00,4800.00,130,2024-03-15
-protein powder,Broad,Health Campaign,1.10,12000,280,308.00,900.00,35,2024-01-15
-protein powder,Broad,Health Campaign,1.30,13500,310,403.00,850.00,30,2024-02-15
-protein powder,Broad,Health Campaign,1.40,11000,260,364.00,780.00,28,2024-03-15
-laptop stand,Exact,Office Campaign,0.75,6000,180,135.00,800.00,30,2024-01-15
-laptop stand,Exact,Office Campaign,0.80,6500,200,160.00,950.00,35,2024-02-15
-laptop stand,Exact,Office Campaign,0.70,5500,160,112.00,750.00,28,2024-03-15
-dog treats,Broad,Pet Campaign,0.60,10000,400,240.00,350.00,60,2024-01-15
-dog treats,Broad,Pet Campaign,0.70,11000,420,294.00,380.00,65,2024-02-15
-dog treats,Broad,Pet Campaign,0.65,10500,410,266.50,360.00,62,2024-03-15
-bluetooth speaker,Phrase,Electronics Campaign,1.80,20000,600,1080.00,3200.00,90,2024-01-15
-bluetooth speaker,Phrase,Electronics Campaign,1.90,21000,650,1235.00,3500.00,95,2024-02-15
-bluetooth speaker,Phrase,Electronics Campaign,2.10,23000,700,1470.00,3800.00,100,2024-03-15
-face cream,Exact,Beauty Campaign,1.00,9000,270,270.00,1100.00,40,2024-01-15
-face cream,Exact,Beauty Campaign,1.20,10000,300,360.00,1300.00,48,2024-02-15
-face cream,Exact,Beauty Campaign,1.15,9500,285,327.75,1250.00,45,2024-03-15`;
+    const sample = `Keyword,Match Type,Platform,Campaign,Bid,Impressions,Clicks,Spend,Sales,Orders,Date
+running shoes,Broad,Amazon,Brand Campaign,1.50,15000,450,675.00,2500.00,85,2024-01-15
+running shoes,Broad,Amazon,Brand Campaign,1.75,16500,520,910.00,3100.00,102,2024-02-15
+running shoes,Broad,Amazon,Brand Campaign,1.60,14200,410,656.00,2800.00,90,2024-03-15
+yoga mat,Exact,Amazon,Product Campaign,0.85,8000,320,272.00,1200.00,45,2024-01-15
+yoga mat,Exact,Amazon,Product Campaign,0.90,8500,350,315.00,1400.00,52,2024-02-15
+yoga mat,Exact,Amazon,Product Campaign,0.95,7800,290,275.50,1100.00,40,2024-03-15
+wireless earbuds,Phrase,Amazon,Generic Campaign,2.10,22000,660,1386.00,4200.00,140,2024-01-15
+wireless earbuds,Phrase,Amazon,Generic Campaign,2.30,24000,720,1656.00,4800.00,155,2024-02-15
+wireless earbuds,Phrase,Amazon,Generic Campaign,2.00,20000,580,1160.00,3800.00,120,2024-03-15
+protein powder,Broad,Google,Search Ads,1.20,12000,480,576.00,2100.00,70,2024-01-15
+protein powder,Broad,Google,Search Ads,1.35,13500,540,729.00,2400.00,78,2024-02-15
+protein powder,Broad,Google,Search Ads,1.25,11000,420,525.00,1900.00,62,2024-03-15
+skincare serum,Exact,Meta,Brand Awareness,0.75,18000,360,270.00,900.00,30,2024-01-15
+skincare serum,Exact,Meta,Brand Awareness,0.80,20000,400,320.00,1050.00,35,2024-02-15
+skincare serum,Exact,Meta,Brand Awareness,0.70,16000,300,210.00,750.00,25,2024-03-15
+laptop stand,Phrase,Amazon,Product Campaign,1.80,9500,380,684.00,2800.00,95,2024-01-15
+laptop stand,Phrase,Amazon,Product Campaign,1.95,10000,400,780.00,3100.00,100,2024-02-15
+laptop stand,Phrase,Amazon,Product Campaign,1.85,9000,350,647.50,2600.00,85,2024-03-15
+face moisturizer,Broad,Google,Display Ads,0.60,25000,250,150.00,400.00,15,2024-01-15
+face moisturizer,Broad,Google,Display Ads,0.65,27000,270,175.50,450.00,17,2024-02-15
+face moisturizer,Broad,Meta,Retargeting,0.55,30000,300,165.00,380.00,13,2024-03-15
+bluetooth speaker,Exact,Amazon,Brand Campaign,2.50,7000,280,700.00,3500.00,110,2024-01-15
+bluetooth speaker,Exact,Amazon,Brand Campaign,2.75,7500,300,825.00,3800.00,120,2024-02-15
+bluetooth speaker,Exact,Amazon,Brand Campaign,2.60,6800,260,676.00,3200.00,100,2024-03-15`;
     processRawData(sample);
 }
 
@@ -1281,12 +1292,14 @@ function updateKPIs() {
 // ========== FILTERS ==========
 function getFilteredData() {
     let data = [...ppcData];
+    const platform = document.getElementById('filterPlatform').value;
     const campaign = document.getElementById('filterCampaign').value;
     const matchType = document.getElementById('filterMatchType').value;
     const dateFrom = document.getElementById('filterDateFrom').value;
     const dateTo = document.getElementById('filterDateTo').value;
     const keyword = document.getElementById('filterKeyword').value.toLowerCase();
 
+    if (platform) data = data.filter(r => r.platform === platform);
     if (campaign) data = data.filter(r => r.campaign === campaign);
     if (matchType) data = data.filter(r => r.matchType === matchType);
     if (dateFrom) data = data.filter(r => r.date >= dateFrom);
@@ -1297,7 +1310,19 @@ function getFilteredData() {
 }
 
 function updateFilters() {
-    const campaigns = [...new Set(ppcData.map(r => r.campaign))].sort();
+    // Platform filter
+    const platforms = [...new Set(ppcData.map(r => r.platform || 'Amazon'))].sort();
+    const platSelect = document.getElementById('filterPlatform');
+    const platVal = platSelect.value;
+    platSelect.innerHTML = '<option value="">All Platforms</option>';
+    platforms.forEach(p => {
+        platSelect.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+    platSelect.value = platVal;
+
+    // Campaign filter (filtered by platform if selected)
+    const filteredByPlat = platVal ? ppcData.filter(r => r.platform === platVal) : ppcData;
+    const campaigns = [...new Set(filteredByPlat.map(r => r.campaign))].sort();
     const select = document.getElementById('filterCampaign');
     const currentVal = select.value;
     select.innerHTML = '<option value="">All Campaigns</option>';
@@ -1325,7 +1350,7 @@ function renderTable() {
 
     const tbody = document.getElementById('tableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:2rem; color:var(--color-text-muted);">No data. Import data from the Upload tab.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:2rem; color:var(--color-text-muted);">No data. Import data from the Upload tab.</td></tr>';
         updateKPIs();
         return;
     }
@@ -1340,6 +1365,7 @@ function renderTable() {
         return `<tr>
             <td><strong>${escapeHtml(r.keyword)}</strong></td>
             <td><span class="badge badge-${matchClass}">${r.matchType}</span></td>
+            <td><span style="color:var(--color-accent);font-size:0.8rem;">${escapeHtml(r.platform || 'Amazon')}</span></td>
             <td>${escapeHtml(r.campaign)}</td>
             <td>$${r.bid.toFixed(2)}</td>
             <td>${r.impressions.toLocaleString()}</td>
@@ -1362,6 +1388,7 @@ function getComputedVal(row, col) {
     switch(col) {
         case 'keyword': return row.keyword.toLowerCase();
         case 'matchType': return row.matchType;
+        case 'platform': return (row.platform || 'Amazon').toLowerCase();
         case 'campaign': return row.campaign;
         case 'bid': return row.bid;
         case 'impressions': return row.impressions;
@@ -1657,7 +1684,7 @@ function exportCSV() {
         return;
     }
 
-    let csv = 'Keyword,Match Type,Campaign,Bid Amount,Impressions,Clicks,Spend,Sales,Orders,Date,CTR%,CPC,ROAS,ACoS%\n';
+    let csv = 'Keyword,Match Type,Platform,Campaign,Bid Amount,Impressions,Clicks,Spend,Sales,Orders,Date,CTR%,CPC,ROAS,ACoS%\n';
     ppcData.forEach(r => {
         const ctr = r.impressions > 0 ? ((r.clicks / r.impressions) * 100).toFixed(2) : '0.00';
         const cpc = r.clicks > 0 ? (r.spend / r.clicks).toFixed(2) : '0.00';
@@ -1719,10 +1746,10 @@ document.addEventListener('DOMContentLoaded', init);
     }
 
     function downloadTemplate(format) {
-        var headers = ['Keyword','Match Type','Campaign','Bid','Impressions','Clicks','Spend','Sales','Orders','Date'];
-        var sample1 = ['wireless earbuds','Exact','Brand Campaign',1.50,1000,50,75.00,250.00,10,'2025-01-15'];
-        var sample2 = ['bluetooth headphones','Broad','Generic Campaign',2.00,800,30,60.00,180.00,7,'2025-01-15'];
-        var sample3 = ['noise cancelling headphones','Phrase','Generic Campaign',1.75,600,25,43.75,150.00,5,'2025-01-15'];
+        var headers = ['Keyword','Match Type','Platform','Campaign','Bid','Impressions','Clicks','Spend','Sales','Orders','Date'];
+        var sample1 = ['wireless earbuds','Exact','Amazon','Brand Campaign',1.50,1000,50,75.00,250.00,10,'2025-01-15'];
+        var sample2 = ['bluetooth headphones','Broad','Google','Search Campaign',2.00,800,30,60.00,180.00,7,'2025-01-15'];
+        var sample3 = ['noise cancelling headphones','Phrase','Meta','Brand Campaign',1.75,600,25,43.75,150.00,5,'2025-01-15'];
         if (format === 'xlsx') {
             loadXLSX(function() {
                 var ws = XLSX.utils.aoa_to_sheet([headers, sample1, sample2, sample3]);
